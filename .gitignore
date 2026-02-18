@@ -1,0 +1,13 @@
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+
+*.env
+*.hidden.*
+
+__pycache__/
+*.py[cod]
+
+*.log
+*.db
