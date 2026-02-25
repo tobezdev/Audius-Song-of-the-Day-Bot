@@ -68,7 +68,10 @@ class ErrorHandler(commands.Cog):
         )
 
         try:
-            await ctx.respond(message, ephemeral=True)
+            await ctx.respond(
+                embed=discord.Embed(description=message, color=discord.Color.og_blurple()),
+                ephemeral=True,
+            )
         except (discord.InteractionResponded, discord.NotFound, discord.HTTPException):
             pass
 

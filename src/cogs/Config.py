@@ -26,23 +26,39 @@ class Config(commands.Cog):
         """Get the value of a config key."""
         value = await get_config(key)
         if value is not None:
-            await ctx.respond(f"Config value for key '{key}': {value}", ephemeral=True)
+            description = f"`{key}` = `{value}`"
         else:
-            await ctx.respond(f"No config value found for key '{key}'", ephemeral=True)
+            description = f"No config value found for key `{key}`."
+        await ctx.respond(
+            embed=discord.Embed(description=description, color=discord.Color.og_blurple()),
+            ephemeral=True,
+        )
 
     @commands.is_owner()
     @config.command(name="set", description="Set the value of a config key.")
     async def set_config(self, ctx: discord.ApplicationContext, key: str, value: str) -> None:
         """Set the value of a config key."""
         await save_config(key.lower(), value)
-        await ctx.respond(f"Config value set for key '{key}': {value}", ephemeral=True)
+        await ctx.respond(
+            embed=discord.Embed(
+                description=f"`{key}` set to `{value}`.",
+                color=discord.Color.og_blurple(),
+            ),
+            ephemeral=True,
+        )
 
     @commands.is_owner()
     @config.command(name="delete", description="Delete a config key.")
     async def delete_config(self, ctx: discord.ApplicationContext, key: str) -> None:
         """Delete a config key."""
         await del_config(key)
-        await ctx.respond(f"Config key '{key}' deleted.", ephemeral=True)
+        await ctx.respond(
+            embed=discord.Embed(
+                description=f"Config key `{key}` deleted.",
+                color=discord.Color.og_blurple(),
+            ),
+            ephemeral=True,
+        )
 
 
 def setup(bot: discord.Bot) -> None:

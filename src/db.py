@@ -3,7 +3,10 @@ Lightweight async SQLite helper for persisting SOTD data.
 
 Tables
 ------
-sotd - one row per day, newest first by `created_at`.
+sotd         - one row per day, newest first by `created_at`.
+config       - global bot key/value config.
+guild_config - per-guild key/value config (sotd_channel_id, sotd_role_id).
+user_dm      - users who have opted in to receive daily SOTD via DM.
 """
 
 import aiosqlite
@@ -42,19 +45,34 @@ CREATE TABLE IF NOT EXISTS config (
 );
 """
 
+_CREATE_GUILD_CONFIG_TABLE = """
+CREATE TABLE IF NOT EXISTS guild_config (
+    guild_id        TEXT    NOT NULL,
+    key             TEXT    NOT NULL,
+    value           TEXT,
+    PRIMARY KEY (guild_id, key)
+);
+"""
+
+_CREATE_USER_DM_TABLE = """
+CREATE TABLE IF NOT EXISTS user_dm (
+    user_id         TEXT    PRIMARY KEY
+);
+"""
+
 
 async def init_db() -> None:
     """Create the database and tables if they don't exist yet."""
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(_CREATE_CONFIG_TABLE)
         await db.execute(_CREATE_SOTD_TABLE)
+        await db.execute(_CREATE_GUILD_CONFIG_TABLE)
+        await db.execute(_CREATE_USER_DM_TABLE)
         await db.commit()
     logger.info(f"Database initialised at {DB_PATH}")
 
     # Seed config defaults (only inserts if the key doesn't already exist)
     _defaults = {
-        "sotd_channel_id": "",
-        "sotd_role_id": "",
         "debug_enabled": "0",
     }
     async with aiosqlite.connect(DB_PATH) as db:
@@ -168,3 +186,110 @@ async def get_sotd_history(limit: int = 10) -> list[dict]:
         ) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Per-guild configuration helpers
+# ---------------------------------------------------------------------------
+
+async def get_guild_config(guild_id: int, key: str) -> Optional[str]:
+    """Get a per-guild config value, or None if not set."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT value FROM guild_config WHERE guild_id = ? AND key = ?",
+            (str(guild_id), key),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row["value"] if row else None
+
+
+async def save_guild_config(guild_id: int, key: str, value: str) -> None:
+    """Set a per-guild config value."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO guild_config (guild_id, key, value) VALUES (?, ?, ?)
+            ON CONFLICT(guild_id, key) DO UPDATE SET value=excluded.value
+            """,
+            (str(guild_id), key, value),
+        )
+        await db.commit()
+        logger.info(f"Guild config set: guild={guild_id} {key} = {value}")
+
+
+async def del_guild_config(guild_id: int, key: str) -> None:
+    """Delete a per-guild config value."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM guild_config WHERE guild_id = ? AND key = ?",
+            (str(guild_id), key),
+        )
+        await db.commit()
+        logger.info(f"Guild config deleted: guild={guild_id} {key}")
+
+
+async def get_all_guild_sotd_configs() -> list[dict]:
+    """Return all guilds that have a sotd_channel_id set, with their optional role_id."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT guild_id, value AS channel_id FROM guild_config WHERE key = 'sotd_channel_id' AND value != ''",
+        ) as cursor:
+            channel_rows = await cursor.fetchall()
+
+        results = []
+        for row in channel_rows:
+            async with db.execute(
+                "SELECT value FROM guild_config WHERE guild_id = ? AND key = 'sotd_role_id'",
+                (row["guild_id"],),
+            ) as role_cursor:
+                role_row = await role_cursor.fetchone()
+            results.append({
+                "guild_id": int(row["guild_id"]),
+                "channel_id": int(row["channel_id"]),
+                "role_id": int(role_row["value"]) if role_row and role_row["value"] else None,
+            })
+        return results
+
+
+# ---------------------------------------------------------------------------
+# User DM opt-in helpers
+# ---------------------------------------------------------------------------
+
+async def add_dm_user(user_id: int) -> None:
+    """Add a user to the DM SOTD list."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO user_dm (user_id) VALUES (?)",
+            (str(user_id),),
+        )
+        await db.commit()
+        logger.info(f"DM SOTD user added: {user_id}")
+
+
+async def remove_dm_user(user_id: int) -> None:
+    """Remove a user from the DM SOTD list."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM user_dm WHERE user_id = ?", (str(user_id),))
+        await db.commit()
+        logger.info(f"DM SOTD user removed: {user_id}")
+
+
+async def get_all_dm_users() -> list[int]:
+    """Return all user IDs opted in to DM SOTD."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT user_id FROM user_dm") as cursor:
+            rows = await cursor.fetchall()
+            return [int(row["user_id"]) for row in rows]
+
+
+async def is_dm_user(user_id: int) -> bool:
+    """Return True if the user is opted in to DM SOTD."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT 1 FROM user_dm WHERE user_id = ?", (str(user_id),)
+        ) as cursor:
+            return await cursor.fetchone() is not None

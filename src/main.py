@@ -37,7 +37,10 @@ async def main() -> None:
         owner_id=OWNER_ID,
         auto_sync_commands=True,
         default_command_contexts={discord.InteractionContextType.guild},
-        default_command_integration_types={discord.IntegrationType.guild_install},
+        default_command_integration_types={
+            discord.IntegrationType.guild_install,
+            discord.IntegrationType.user_install,
+        },
         intents=intents,
     )
     setattr(bot, "logger", logger)
