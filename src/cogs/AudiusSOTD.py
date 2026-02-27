@@ -382,8 +382,8 @@ class AudiusSOTD(commands.Cog):
     @sotd.command(
         name="unsubscribe",
         description="Stop receiving the daily Song of the Day in your DMs.",
-        integration_types=_DM_INTEGRATION_TYPES,
-        contexts=_DM_CONTEXTS,
+        integration_types={discord.IntegrationType.user_install},
+        contexts={discord.InteractionContextType.guild, discord.InteractionContextType.bot_dm, discord.InteractionContextType.private_channel},
     )
     async def unsubscribe(self, ctx: discord.ApplicationContext) -> None:
         """Opt out of receiving the daily SOTD via DM."""
