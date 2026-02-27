@@ -45,17 +45,6 @@ API_URL = os.getenv("API_URL")
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
 
-# Contexts/integration types for commands that should work in DMs (user-install)
-_DM_INTEGRATION_TYPES = [
-    discord.IntegrationType.guild_install,
-    discord.IntegrationType.user_install,
-]
-_DM_CONTEXTS = [
-    discord.InteractionContextType.guild,
-    discord.InteractionContextType.bot_dm,
-    discord.InteractionContextType.private_channel,
-]
-
 
 class SOTDView(discord.ui.View):
     """View with a 'Listen on Audius!' link button."""
@@ -295,7 +284,7 @@ class AudiusSOTD(commands.Cog):
 
     # --- Guild setup commands (server owner or SOTD Bot Admin only) ---
 
-    @sotd.command(name="set-channel", description="Set the channel where SOTD is posted for this server.")
+    @sotd.command(name="set-channel", description="Set the channel where SOTD is posted for this server.", contexts=[discord.InteractionContextType.guild])
     @discord.option("channel", discord.TextChannel, description="The channel to post the SOTD in.")
     async def set_channel(self, ctx: discord.ApplicationContext, channel: discord.TextChannel) -> None:
         """Set the SOTD channel for this guild."""
@@ -318,7 +307,7 @@ class AudiusSOTD(commands.Cog):
             ephemeral=True,
         )
 
-    @sotd.command(name="set-role", description="Set an optional role to mention with each SOTD post. Leave blank to remove ping.")
+    @sotd.command(name="set-role", description="Set an optional role to mention with each SOTD post. Leave blank to remove ping.", contexts=[discord.InteractionContextType.guild])
     @discord.option("role", discord.Role, description="The role to mention (leave blank to remove).", required=False)
     async def set_role(self, ctx: discord.ApplicationContext, role: discord.Role | None = None) -> None:
         """Set or clear the SOTD mention role for this guild."""
@@ -356,8 +345,8 @@ class AudiusSOTD(commands.Cog):
     @sotd.command(
         name="subscribe",
         description="Receive the daily Song of the Day directly in your DMs.",
-        integration_types=_DM_INTEGRATION_TYPES,
-        contexts=_DM_CONTEXTS,
+        integration_types={discord.IntegrationType.user_install},
+        contexts={discord.InteractionContextType.guild, discord.InteractionContextType.bot_dm, discord.InteractionContextType.private_channel},
     )
     async def subscribe(self, ctx: discord.ApplicationContext) -> None:
         """Opt in to receiving the daily SOTD via DM."""
