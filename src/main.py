@@ -11,12 +11,15 @@ CLI Flags
 --debug, -d            Force-enable DEBUG-level logging (overrides DB config).
 --disable-cogs, -dc    Space-separated list of cog names to skip loading
                        (without the .py extension).
+--output-stream, -o    File path to mirror log output to, or '<stdout>' to
+                       stream to the terminal.
 """
 
 import argparse
 import asyncio
 import logging
 import os
+import sys
 
 import discord
 import dotenv
@@ -52,6 +55,14 @@ def parse_args() -> argparse.Namespace:
         metavar="COG",
         help="One or more cog names (without .py) to skip loading.",
     )
+    parser.add_argument(
+        "-t", "--token",
+        help="Discord bot token (overrides TOKEN environment variable)."
+    )
+    parser.add_argument(
+        "-o", "--output-stream",
+        help="Optional file path to write the bot's output stream (stdout and stderr) or '.' for terminal output."
+    )
     return parser.parse_args()
 
 
@@ -59,10 +70,20 @@ async def main() -> None:
     """Initialise and start the Discord bot."""
     args = parse_args()
 
+
     # Apply --debug flag immediately
     if args.debug:
         logger.setLevel(logging.DEBUG)
         logger.debug("Debug logging force-enabled via --debug flag.")
+
+    # Apply --output-stream flag
+    if args.output_stream:
+        if args.output_stream.strip().lower() == ".":
+            stream_handler = logging.StreamHandler(sys.stdout)
+        else:
+            stream_handler = logging.StreamHandler(open(args.output_stream, "w", encoding="utf-8"))
+        stream_handler.setFormatter(logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s"))
+        logger.addHandler(stream_handler)
 
     intents = discord.Intents.default()
     bot = discord.Bot(
@@ -112,7 +133,7 @@ async def main() -> None:
             "Continuing with environment variables from the system."
         )
 
-    token = os.getenv("TOKEN")
+    token = args.token or os.getenv("TOKEN")
     if not token:
         logger.error(
             "TOKEN environment variable is not set. "
