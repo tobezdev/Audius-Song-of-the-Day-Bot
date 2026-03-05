@@ -8,11 +8,11 @@ debug_enabled  - When set in the DB config, enables DEBUG-level logging.
 
 CLI Flags
 ---------
---debug, -d            Force-enable DEBUG-level logging (overrides DB config).
---disable-cogs, -dc    Space-separated list of cog names to skip loading
-                       (without the .py extension).
---output-stream, -o    File path to mirror log output to, or '<stdout>' to
-                       stream to the terminal.
+--debug, -d           - Force-enable DEBUG-level logging (overrides DB config).
+--disable-cogs, -dc   - Space-separated list of cog names to skip loading
+                        (without the .py extension).
+--output-stream, -o   - File path to mirror log output to, or '.' to
+                        stream to the terminal.
 """
 
 import argparse
