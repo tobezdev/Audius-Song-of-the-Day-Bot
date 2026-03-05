@@ -33,15 +33,6 @@ A Discord bot built with [py-cord](https://pycord.dev/) that automatically selec
 | `/sotd subscribe` | Receive the daily Song of the Day in your DMs. |
 | `/sotd unsubscribe` | Stop receiving the daily Song of the Day in your DMs. |
 
-### Owner-Only
-
-| Command | Description |
-|---|---|
-| `/config get <key>` | Get the value of a bot config key. |
-| `/config set <key> <value>` | Set a bot config key. |
-| `/config delete <key>` | Delete a bot config key. |
-| `/check-latency` | Check the bot's latency. |
-
 ## Tech Stack
 
 - **Python 3.14**
@@ -55,4 +46,4 @@ A Discord bot built with [py-cord](https://pycord.dev/) that automatically selec
 
 - [Invite the Bot](https://discord.com/oauth2/authorize?client_id=1473099313080176774)
 - [GitHub Repository](https://github.com/tobezdev/Audius-Song-of-the-Day)
-- [Website](https://audius-sotd.tobezdev.com/) <!-- update with actual site URL when deployed -->
+- [Website](https://audius-sotd.tobezdev.com/)
