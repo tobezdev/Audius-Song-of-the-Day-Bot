@@ -5,8 +5,15 @@ Environment
 -----------
 TOKEN          - Discord bot token (required).
 debug_enabled  - When set in the DB config, enables DEBUG-level logging.
+
+CLI Flags
+---------
+--debug, -d            Force-enable DEBUG-level logging (overrides DB config).
+--disable-cogs, -dc    Space-separated list of cog names to skip loading
+                       (without the .py extension).
 """
 
+import argparse
 import asyncio
 import logging
 import os
@@ -30,8 +37,33 @@ logger.addHandler(_file_handler)
 OWNER_ID = 969254887621820526
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Audius SOTD Discord Bot")
+    parser.add_argument(
+        "-d", "--debug",
+        action="store_true",
+        help="Force-enable DEBUG-level logging regardless of DB config.",
+    )
+    parser.add_argument(
+        "-dc", "--disable-cogs",
+        nargs="+",
+        default=[],
+        metavar="COG",
+        help="One or more cog names (without .py) to skip loading.",
+    )
+    return parser.parse_args()
+
+
 async def main() -> None:
     """Initialise and start the Discord bot."""
+    args = parse_args()
+
+    # Apply --debug flag immediately
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Debug logging force-enabled via --debug flag.")
+
     intents = discord.Intents.default()
     bot = discord.Bot(
         owner_id=OWNER_ID,
@@ -50,20 +82,27 @@ async def main() -> None:
         # Ensure DB tables exist before anything else
         await init_db()
 
-        # Apply debug_enabled setting from DB config
-        debug_enabled = await get_config("debug_enabled")
-        if debug_enabled and debug_enabled not in ("0", "false", ""):
-            logger.setLevel(logging.DEBUG)
-            logger.debug("Debug logging enabled via DB config.")
+        # Apply debug_enabled setting from DB config (unless already forced by CLI)
+        if not args.debug:
+            debug_enabled = await get_config("debug_enabled")
+            if debug_enabled and debug_enabled not in ("0", "false", ""):
+                logger.setLevel(logging.DEBUG)
+                logger.debug("Debug logging enabled via DB config.")
 
         if bot.user:
             logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
 
+    disabled_cogs = {name.lower() for name in args.disable_cogs}
+
     for filename in os.listdir("./src/cogs"):
         if filename.endswith(".py") and not filename.startswith("__"):
+            cog_name = filename[:-3]
+            if cog_name.lower() in disabled_cogs:
+                logger.info(f"Skipping disabled cog: `{cog_name}`")
+                continue
             try:
-                bot.load_extension(f"cogs.{filename[:-3]}")
-                logger.info(f"Loaded extension: `{filename[:-3]}` from {filename}")
+                bot.load_extension(f"cogs.{cog_name}")
+                logger.info(f"Loaded extension: `{cog_name}` from {filename}")
             except discord.ExtensionError as exc:
                 logger.error(f"Failed to load extension {filename}: {exc}")
 
