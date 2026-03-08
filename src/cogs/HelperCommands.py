@@ -40,27 +40,25 @@ class BOCmds(commands.Cog):
         self.bot = bot
 
     @commands.is_owner()
-    @commands.slash_command(name="clear-dm", description="Clears the DM channel.", contexts=[discord.InteractionContextType.bot_dm])
+    @commands.slash_command(name="clear", description="Clears the current channel of the SOTD Bot's messages.", contexts=[discord.InteractionContextType.bot_dm, discord.InteractionContextType.guild])
     async def clear_dm(self, ctx: discord.ApplicationContext) -> None:
-        """Clear the DM channel."""
-        if ctx.guild is not None:
-            await ctx.respond("This command can only be used in DMs.", ephemeral=True)
-            return
+        """Clear the current channel."""
+        await ctx.defer(ephemeral=True)
 
         try:
             for message in await ctx.channel.history(limit=None).flatten():
                 await message.delete() if message.author == self.bot.user else None
-            await ctx.respond("DM channel cleared.", ephemeral=True, delete_after=5)
+            await ctx.respond("Channel cleared.", ephemeral=True, delete_after=5)
         except discord.Forbidden:
             await ctx.respond(
-                "I don't have permission to clear the DM channel.",
+                "I don't have permission to clear the channel.",
                 ephemeral=True,
                 delete_after=5,
             )
 
     @commands.is_owner()
     @commands.slash_command(name="send", description="Sends a message to the channel specified.", contexts=[discord.InteractionContextType.bot_dm])
-    @discord.option("message_id", str, description="The ID of the message to send.", required=True)
+    @discord.option("message_id", str, description="The ID of the message to send.", required=True, choices=['rules'])
     @discord.option("channel", discord.TextChannel, description="The ID of the channel to send the message to.", required=True)
     async def _send_message(self, ctx: discord.ApplicationContext, message_id: str, channel: discord.TextChannel) -> None:
         """Sends a message to the channel specified."""
