@@ -55,6 +55,7 @@ class BOCmds(commands.Cog):
                 ephemeral=True,
                 delete_after=5,
             )
+        return
 
     @commands.is_owner()
     @commands.slash_command(name="send", description="Sends a message to the channel specified.", contexts=[discord.InteractionContextType.bot_dm])

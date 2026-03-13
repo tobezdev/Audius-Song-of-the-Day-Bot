@@ -80,6 +80,7 @@ class ErrorHandler(commands.Cog):
             f"with user {ctx.user} (@{ctx.user.id}): {error}",
             exc_info=error,
         )
+        return
 
 
 def setup(bot: discord.Bot) -> None:

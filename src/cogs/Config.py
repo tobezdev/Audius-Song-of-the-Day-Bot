@@ -42,6 +42,7 @@ class Config(commands.Cog):
             embed=discord.Embed(description=description, color=discord.Color.og_blurple()),
             ephemeral=True,
         )
+        return
 
     @commands.is_owner()
     @config.command(name="set", description="Set the value of a config key.")
@@ -55,6 +56,7 @@ class Config(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
     @commands.is_owner()
     @config.command(name="delete", description="Delete a config key.")
@@ -68,6 +70,7 @@ class Config(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
     @commands.is_owner()
     @config.command(name="add-premium", description="Grant premium status to a guild or user.")
@@ -82,6 +85,7 @@ class Config(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
     @commands.is_owner()
     @config.command(name="remove-premium", description="Revoke premium status from a guild or user.")
@@ -99,6 +103,7 @@ class Config(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
     @commands.is_owner()
     async def clear_preferences(self, ctx: discord.ApplicationContext, target_id: str) -> None:
@@ -112,6 +117,7 @@ class Config(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
 
 def setup(bot: discord.Bot) -> None:

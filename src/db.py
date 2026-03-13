@@ -117,6 +117,7 @@ async def save_config(key: str, value: str) -> None:
         )
         await db.commit()
         logger.info(f"Config set: {key} = {value}")
+    return
 
 
 async def get_config(key: str) -> Optional[str]:
@@ -134,6 +135,7 @@ async def del_config(key: str) -> None:
         await db.execute("DELETE FROM config WHERE key = ?", (key,))
         await db.commit()
         logger.info(f"Config deleted: {key}")
+    return
 
 
 async def save_sotd(sotd: dict) -> int:
@@ -236,6 +238,7 @@ async def save_guild_config(guild_id: int, key: str, value: str) -> None:
         )
         await db.commit()
         logger.info(f"Guild config set: guild={guild_id} {key} = {value}")
+    return
 
 
 async def del_guild_config(guild_id: int, key: str) -> None:
@@ -247,6 +250,7 @@ async def del_guild_config(guild_id: int, key: str) -> None:
         )
         await db.commit()
         logger.info(f"Guild config deleted: guild={guild_id} {key}")
+    return
 
 
 async def get_all_guild_sotd_configs() -> list[dict]:
@@ -286,6 +290,7 @@ async def add_dm_user(user_id: int) -> None:
         )
         await db.commit()
         logger.info(f"DM SOTD user added: {user_id}")
+    return
 
 
 async def remove_dm_user(user_id: int) -> None:
@@ -294,6 +299,7 @@ async def remove_dm_user(user_id: int) -> None:
         await db.execute("DELETE FROM user_dm WHERE user_id = ?", (str(user_id),))
         await db.commit()
         logger.info(f"DM SOTD user removed: {user_id}")
+    return
 
 
 async def get_all_dm_users() -> list[int]:
@@ -328,6 +334,7 @@ async def add_premium(guild_or_user_id: int) -> None:
         )
         await db.commit()
         logger.info(f"Premium added: {guild_or_user_id}")
+    return
 
 
 async def remove_premium(guild_or_user_id: int) -> None:
@@ -339,6 +346,7 @@ async def remove_premium(guild_or_user_id: int) -> None:
         )
         await db.commit()
         logger.info(f"Premium removed: {guild_or_user_id}")
+    return
 
 
 async def is_premium(guild_or_user_id: int) -> bool:
@@ -379,6 +387,7 @@ async def save_user_config(user_id: int, key: str, value: str) -> None:
         )
         await db.commit()
         logger.info(f"User config set: user={user_id} {key} = {value}")
+    return
 
 
 async def del_user_config(user_id: int, key: str) -> None:
@@ -390,3 +399,4 @@ async def del_user_config(user_id: int, key: str) -> None:
         )
         await db.commit()
         logger.info(f"User config deleted: user={user_id} {key}")
+    return

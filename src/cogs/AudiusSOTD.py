@@ -179,6 +179,7 @@ class AudiusSOTD(commands.Cog):
     def cog_unload(self) -> None:
         """Cancel the background loop when the cog is unloaded."""
         self.update_sotd.cancel()
+        return
 
     # ------------------------------------------------------------------
     # API helper
@@ -282,11 +283,13 @@ class AudiusSOTD(commands.Cog):
                 await remove_dm_user(user_id)
             except discord.HTTPException as exc:
                 logger.error(f"Failed to DM user {user_id}: {exc}")
+        return
 
     @update_sotd.before_loop
     async def before_update_sotd(self) -> None:
         """Wait for the bot to be ready before starting the loop."""
         await self.bot.wait_until_ready()
+        return
 
 
     # --- The slash command group for all /sotd <> commands ---
@@ -326,6 +329,7 @@ class AudiusSOTD(commands.Cog):
         embed.set_thumbnail(url=sotd_data["artwork_url"])
         view = SOTDView(permalink=sotd_data["permalink"])
         await ctx.respond(embed=embed, view=view)
+        return
 
     @sotd.command(name="history", description="Show past Songs of the Day")
     async def history(self, ctx: discord.ApplicationContext) -> None:
@@ -357,6 +361,7 @@ class AudiusSOTD(commands.Cog):
             color=discord.Color.og_blurple(),
         )
         await ctx.respond(embed=embed)
+        return
 
     # --- Guild setup commands (server owner or SOTD Bot Admin only) ---
 
@@ -382,6 +387,7 @@ class AudiusSOTD(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
     @sotd.command(name="set-role", description="Set an optional role to mention with each SOTD post. Leave blank to remove ping.", contexts=[discord.InteractionContextType.guild])
     @discord.option("role", discord.Role, description="The role to mention (leave blank to remove).", required=False)
@@ -415,6 +421,7 @@ class AudiusSOTD(commands.Cog):
                 ),
                 ephemeral=True,
             )
+        return
 
     # --- Premium color customisation ---
 
@@ -498,6 +505,7 @@ class AudiusSOTD(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
     # --- User DM opt-in commands (available in DMs for user-installed accounts) ---
 
@@ -537,6 +545,7 @@ class AudiusSOTD(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
     @sotd.command(
         name="unsubscribe",
@@ -564,6 +573,7 @@ class AudiusSOTD(commands.Cog):
             ),
             ephemeral=True,
         )
+        return
 
 
 def setup(bot: discord.Bot) -> None:
