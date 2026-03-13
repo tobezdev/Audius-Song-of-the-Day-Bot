@@ -75,7 +75,7 @@ def _release_timestamp(date_str: str | None, style: str | None = None) -> str:
 def _build_embed(sotd_data: dict, title: str = "New Song of the Day!") -> discord.Embed:
     """Build a standard SOTD embed from track data."""
     embed = discord.Embed(
-        title=title,
+        title=title + f" (#{sotd_data['id']})",
         description=(
             f"**{sotd_data['track_title']}** by **{sotd_data['artist_name']}**\n"
             f"Genre: {sotd_data['genre']}\n"
