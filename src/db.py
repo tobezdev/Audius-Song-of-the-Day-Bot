@@ -5,8 +5,10 @@ Tables
 ------
 sotd         - one row per day, newest first by `created_at`.
 config       - global bot key/value config.
-guild_config - per-guild key/value config (sotd_channel_id, sotd_role_id).
+guild_config - per-guild key/value config (sotd_channel_id, sotd_role_id, sotd_embed_color).
+user_config  - per-user key/value config (sotd_embed_color).
 user_dm      - users who have opted in to receive daily SOTD via DM.
+premium      - guild or user IDs that have premium features unlocked.
 """
 
 import aiosqlite
@@ -60,6 +62,21 @@ CREATE TABLE IF NOT EXISTS user_dm (
 );
 """
 
+_CREATE_PREMIUM_TABLE = """
+CREATE TABLE IF NOT EXISTS premium (
+    guild_or_user_id TEXT PRIMARY KEY
+);
+"""
+
+_CREATE_USER_CONFIG_TABLE = """
+CREATE TABLE IF NOT EXISTS user_config (
+    user_id         TEXT    NOT NULL,
+    key             TEXT    NOT NULL,
+    value           TEXT,
+    PRIMARY KEY (user_id, key)
+);
+"""
+
 
 async def init_db() -> None:
     """Create the database and tables if they don't exist yet."""
@@ -68,6 +85,8 @@ async def init_db() -> None:
         await db.execute(_CREATE_SOTD_TABLE)
         await db.execute(_CREATE_GUILD_CONFIG_TABLE)
         await db.execute(_CREATE_USER_DM_TABLE)
+        await db.execute(_CREATE_PREMIUM_TABLE)
+        await db.execute(_CREATE_USER_CONFIG_TABLE)
         await db.commit()
     logger.info(f"Database initialised at {DB_PATH}")
 
@@ -83,6 +102,7 @@ async def init_db() -> None:
             )
         await db.commit()
     logger.info("Config defaults seeded.")
+    return
 
 
 async def save_config(key: str, value: str) -> None:
@@ -293,3 +313,80 @@ async def is_dm_user(user_id: int) -> bool:
             "SELECT 1 FROM user_dm WHERE user_id = ?", (str(user_id),)
         ) as cursor:
             return await cursor.fetchone() is not None
+
+
+# ---------------------------------------------------------------------------
+# Premium helpers
+# ---------------------------------------------------------------------------
+
+async def add_premium(guild_or_user_id: int) -> None:
+    """Grant premium status to a guild or user."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO premium (guild_or_user_id) VALUES (?)",
+            (str(guild_or_user_id),),
+        )
+        await db.commit()
+        logger.info(f"Premium added: {guild_or_user_id}")
+
+
+async def remove_premium(guild_or_user_id: int) -> None:
+    """Revoke premium status from a guild or user."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM premium WHERE guild_or_user_id = ?",
+            (str(guild_or_user_id),),
+        )
+        await db.commit()
+        logger.info(f"Premium removed: {guild_or_user_id}")
+
+
+async def is_premium(guild_or_user_id: int) -> bool:
+    """Return True if the guild or user has premium status."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT 1 FROM premium WHERE guild_or_user_id = ?",
+            (str(guild_or_user_id),),
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
+
+# ---------------------------------------------------------------------------
+# Per-user configuration helpers
+# ---------------------------------------------------------------------------
+
+async def get_user_config(user_id: int, key: str) -> Optional[str]:
+    """Get a per-user config value, or None if not set."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT value FROM user_config WHERE user_id = ? AND key = ?",
+            (str(user_id), key),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row["value"] if row else None
+
+
+async def save_user_config(user_id: int, key: str, value: str) -> None:
+    """Set a per-user config value."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO user_config (user_id, key, value) VALUES (?, ?, ?)
+            ON CONFLICT(user_id, key) DO UPDATE SET value=excluded.value
+            """,
+            (str(user_id), key, value),
+        )
+        await db.commit()
+        logger.info(f"User config set: user={user_id} {key} = {value}")
+
+
+async def del_user_config(user_id: int, key: str) -> None:
+    """Delete a per-user config value."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM user_config WHERE user_id = ? AND key = ?",
+            (str(user_id), key),
+        )
+        await db.commit()
+        logger.info(f"User config deleted: user={user_id} {key}")

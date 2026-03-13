@@ -18,6 +18,7 @@ User DM opt-in (works in DMs when bot is user-installed):
 
 import logging
 import os
+import re
 from datetime import datetime
 
 import aiohttp
@@ -32,11 +33,15 @@ from db import (
     get_all_dm_users,
     get_all_guild_sotd_configs,
     get_current_sotd,
+    get_guild_config,
     get_sotd_history,
+    get_user_config,
     is_dm_user,
+    is_premium,
     remove_dm_user,
     save_guild_config,
     save_sotd,
+    save_user_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,7 +77,7 @@ def _release_timestamp(date_str: str | None, style: str | None = None) -> str:
         return date_str
 
 
-def _build_embed(sotd_data: dict, title: str = "New Song of the Day!") -> discord.Embed:
+def _build_embed(sotd_data: dict, title: str = "New Song of the Day!", color: discord.Color | None = None) -> discord.Embed:
     """Build a standard SOTD embed from track data."""
     embed = discord.Embed(
         title=title + f" (#{sotd_data['id']})",
@@ -84,7 +89,7 @@ def _build_embed(sotd_data: dict, title: str = "New Song of the Day!") -> discor
             f"Reposts: {sotd_data['repost_count']} | "
             f"Favorites: {sotd_data['favorite_count']}"
         ),
-        color=discord.Color.og_blurple(),
+        color=color or discord.Color.og_blurple(),
     )
     embed.set_thumbnail(url=sotd_data["artwork_url"])
     return embed
@@ -100,6 +105,68 @@ async def _is_sotd_admin(ctx: discord.ApplicationContext) -> bool:
         return False
     admin_role = discord.utils.get(ctx.guild.roles, name="SOTD Bot Admin")
     return bool(admin_role and admin_role in ctx.author.roles)
+
+
+# Map of accepted color names to discord.Color factory methods
+_COLOR_NAMES: dict[str, discord.Color] = {
+    "red": discord.Color.red(),
+    "dark_red": discord.Color.dark_red(),
+    "blue": discord.Color.blue(),
+    "dark_blue": discord.Color.dark_blue(),
+    "green": discord.Color.green(),
+    "dark_green": discord.Color.dark_green(),
+    "gold": discord.Color.gold(),
+    "dark_gold": discord.Color.dark_gold(),
+    "orange": discord.Color.orange(),
+    "dark_orange": discord.Color.dark_orange(),
+    "purple": discord.Color.purple(),
+    "dark_purple": discord.Color.dark_purple(),
+    "magenta": discord.Color.magenta(),
+    "dark_magenta": discord.Color.dark_magenta(),
+    "teal": discord.Color.teal(),
+    "dark_teal": discord.Color.dark_teal(),
+    "blurple": discord.Color.blurple(),
+    "og_blurple": discord.Color.og_blurple(),
+    "greyple": discord.Color.greyple(),
+    "dark_grey": discord.Color.dark_grey(),
+    "light_grey": discord.Color.light_grey(),
+    "yellow": discord.Color.yellow(),
+    "fuchsia": discord.Color.fuchsia(),
+    "brand_red": discord.Color.brand_red(),
+    "brand_green": discord.Color.brand_green(),
+    "nitro_pink": discord.Color.nitro_pink(),
+}
+
+_RGB_PATTERN = re.compile(r"^\(?(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\)?$")
+
+
+def _parse_color(raw: str) -> discord.Color | None:
+    """Parse a color string into a discord.Color, or return None on failure.
+
+    Accepts:
+      - Named colors (e.g. "red", "og_blurple")
+      - Hex codes (e.g. "#FF0000", "FF0000")
+      - RGB tuples (e.g. "255,0,0", "(255, 0, 0)")
+    """
+    cleaned = raw.strip().lower().replace(" ", "_").replace("-", "_")
+
+    # Named color
+    if cleaned in _COLOR_NAMES:
+        return _COLOR_NAMES[cleaned]
+
+    # Hex code
+    hex_str = raw.strip().lstrip("#")
+    if re.fullmatch(r"[0-9a-fA-F]{6}", hex_str):
+        return discord.Color(int(hex_str, 16))
+
+    # RGB tuple
+    m = _RGB_PATTERN.match(raw.strip())
+    if m:
+        r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if all(0 <= c <= 255 for c in (r, g, b)):
+            return discord.Color.from_rgb(r, g, b)
+
+    return None
 
 
 class AudiusSOTD(commands.Cog):
@@ -172,7 +239,6 @@ class AudiusSOTD(commands.Cog):
         await save_sotd(sotd_data)
         logger.info(f"Updated SOTD: {sotd_data['track_title']} by {sotd_data['artist_name']}")
 
-        embed = _build_embed(sotd_data)
         view = SOTDView(permalink=sotd_data["permalink"])
 
         # --- Post to all configured guild channels ---
@@ -182,6 +248,11 @@ class AudiusSOTD(commands.Cog):
             if not channel or not isinstance(channel, discord.TextChannel):
                 logger.warning(f"Guild {cfg['guild_id']}: channel {cfg['channel_id']} not found or not a text channel.")
                 continue
+
+            # Use custom embed color if the guild has one set
+            color_val = await get_guild_config(cfg["guild_id"], "sotd_embed_color")
+            color = discord.Color(int(color_val)) if color_val else None
+            embed = _build_embed(sotd_data, color=color)
 
             role = channel.guild.get_role(cfg["role_id"]) if cfg["role_id"] else None
             mention = role.mention if isinstance(role, discord.Role) else ""
@@ -196,6 +267,11 @@ class AudiusSOTD(commands.Cog):
         dm_user_ids = await get_all_dm_users()
         for user_id in dm_user_ids:
             try:
+                # Use custom embed color if the user has one set
+                color_val = await get_user_config(user_id, "sotd_embed_color")
+                color = discord.Color(int(color_val)) if color_val else None
+                embed = _build_embed(sotd_data, color=color)
+
                 user = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
                 await user.send(embed=embed, view=view)
             except discord.Forbidden:
@@ -339,6 +415,89 @@ class AudiusSOTD(commands.Cog):
                 ),
                 ephemeral=True,
             )
+
+    # --- Premium color customisation ---
+
+    @sotd.command(
+        name="set-color",
+        description="Set a custom embed color for SOTD announcements (premium only).",
+        contexts={discord.InteractionContextType.guild, discord.InteractionContextType.bot_dm, discord.InteractionContextType.private_channel},
+    )
+    @discord.option("color", str, description="A color name (e.g. red, blurple), hex code (#FF0000), or RGB tuple (255,0,0).")
+    @discord.option("scope", str, description="Set color for 'guild' or 'user'. Inferred from context if omitted.", required=False, choices=["guild", "user"])
+    async def set_color(self, ctx: discord.ApplicationContext, color: str, scope: str | None = None) -> None:
+        """Set a custom SOTD embed color for a premium guild or user."""
+        # Determine effective scope
+        if scope is None:
+            scope = "guild" if ctx.guild is not None else "user"
+        if scope == "guild" and ctx.guild is None:
+            await ctx.respond(
+                embed=discord.Embed(
+                    description="The `guild` scope can only be used inside a server.",
+                    color=discord.Color.og_blurple(),
+                ),
+                ephemeral=True,
+            )
+            return
+
+        # Determine target ID and run permission checks
+        if scope == "guild":
+            target_id = ctx.guild.id
+            if not await _is_sotd_admin(ctx):
+                await ctx.respond(
+                    embed=discord.Embed(
+                        description="You need to be the server owner or have the **SOTD Bot Admin** role to use this command.",
+                        color=discord.Color.og_blurple(),
+                    ),
+                    ephemeral=True,
+                )
+                return
+        else:
+            target_id = ctx.author.id
+
+        # Premium gate
+        if not await is_premium(target_id):
+            await ctx.respond(
+                embed=discord.Embed(
+                    description="This feature requires **premium**. Contact the bot owner for more information.",
+                    color=discord.Color.og_blurple(),
+                ),
+                ephemeral=True,
+            )
+            return
+
+        # Parse color input
+        parsed = _parse_color(color)
+        if parsed is None:
+            names = ", ".join(f"`{n}`" for n in list(_COLOR_NAMES)[:10])
+            await ctx.respond(
+                embed=discord.Embed(
+                    description=(
+                        f"Could not parse `{color}` as a color.\n\n"
+                        f"**Accepted formats:**\n"
+                        f"• Color name: {names}, ...\n"
+                        f"• Hex code: `#FF0000`\n"
+                        f"• RGB tuple: `255,0,0`"
+                    ),
+                    color=discord.Color.og_blurple(),
+                ),
+                ephemeral=True,
+            )
+            return
+
+        # Save the color
+        if scope == "guild":
+            await save_guild_config(ctx.guild.id, "sotd_embed_color", str(parsed.value))
+        else:
+            await save_user_config(ctx.author.id, "sotd_embed_color", str(parsed.value))
+
+        await ctx.respond(
+            embed=discord.Embed(
+                description=f"SOTD embed color set to `#{parsed.value:06X}` for **{scope}**.",
+                color=parsed,
+            ),
+            ephemeral=True,
+        )
 
     # --- User DM opt-in commands (available in DMs for user-installed accounts) ---
 
