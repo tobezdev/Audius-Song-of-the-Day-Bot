@@ -29,6 +29,7 @@ class Ping(commands.Cog):
             ephemeral=True,
             delete_after=10,
         )
+        return
 
 
 def setup(bot: discord.Bot) -> None:
