@@ -4,11 +4,10 @@ Bot entry-point — loads extensions, configures logging, and starts the bot.
 Environment
 -----------
 TOKEN          - Discord bot token (required).
-debug_enabled  - When set in the DB config, enables DEBUG-level logging.
 
 CLI Flags
 ---------
---debug, -d           - Force-enable DEBUG-level logging (overrides DB config).
+--debug, -d           - Force-enable DEBUG-level logging.
 --disable-cogs, -dc   - Space-separated list of cog names to skip loading
                         (without the .py extension).
 --output-stream, -o   - File path to mirror log output to, or '.' to
@@ -24,7 +23,7 @@ import sys
 import discord
 import dotenv
 
-from db import init_db, get_config
+from db import init_db
 
 env_loaded = dotenv.load_dotenv()
 
@@ -46,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-d", "--debug",
         action="store_true",
-        help="Force-enable DEBUG-level logging regardless of DB config.",
+        help="Force-enable DEBUG-level logging.",
     )
     parser.add_argument(
         "-dc", "--disable-cogs",
@@ -102,13 +101,6 @@ async def main() -> None:
     async def on_ready() -> None:
         # Ensure DB tables exist before anything else
         await init_db()
-
-        # Apply debug_enabled setting from DB config (unless already forced by CLI)
-        if not args.debug:
-            debug_enabled = await get_config("debug_enabled")
-            if debug_enabled and debug_enabled not in ("0", "false", ""):
-                logger.setLevel(logging.DEBUG)
-                logger.debug("Debug logging enabled via DB config.")
 
         if bot.user:
             logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
